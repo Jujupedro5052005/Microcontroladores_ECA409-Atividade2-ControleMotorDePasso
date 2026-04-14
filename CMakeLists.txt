@@ -46,7 +46,8 @@ pico_enable_stdio_usb(Atividade2-MotorDePasso 1)
 
 # Add the standard library to the build
 target_link_libraries(Atividade2-MotorDePasso
-        pico_stdlib)
+        pico_stdlib
+        hardware_adc)
 
 # Add the standard include files to the build
 target_include_directories(Atividade2-MotorDePasso PRIVATE
