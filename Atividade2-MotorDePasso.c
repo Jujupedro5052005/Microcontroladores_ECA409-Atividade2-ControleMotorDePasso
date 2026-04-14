@@ -24,9 +24,12 @@ int mat_seq[8][4] = {
     {1, 0, 0, 1},
 };
 
-// Incializa variaveis
+// Inicializa variaveis globais do step
 int passo_atual = 0;
 int passo_setpoint = 0;
+
+// Ajuste alpha do filtro EMA (menor alpha, mais suave e mais lento)
+const float alpha = 0.1f;
 
 
 // Funcao chamada pelo repeating timer
@@ -35,7 +38,7 @@ bool step_callback(struct repeating_timer *t){
     // como se fosse uma variavel global que so esta funcao pode acessar 
     // esse igual a false so funciona na criacao
     // em outras chamadas, ele apenas pega o valor anterior que ja estava
-    static int step_state = 1;
+    static int step_state = 0;
     static int passos = 0;
 
     // Implementacao da sequencia em half step
@@ -47,8 +50,8 @@ bool step_callback(struct repeating_timer *t){
     passos = passo_setpoint - passo_atual;
     // Incrementar
     if (passos > 0){
-        if (step_state >= 8){
-            step_state = 1;
+        if (step_state >= 7){
+            step_state = 0;
         } 
         else {
             step_state++;
@@ -58,8 +61,8 @@ bool step_callback(struct repeating_timer *t){
 
     // Decrementar
     if (passos < 0){
-        if (step_state <= 1){
-            step_state = 8;
+        if (step_state <= 0){
+            step_state = 7;
         } 
         else {
             step_state--;
@@ -99,9 +102,14 @@ int main()
     add_repeating_timer_ms(5, step_callback, NULL, &timer);
 
     bool first_time = true;
+    float adc_filtrado = 0.0f;
     while (true) {
         uint16_t raw = adc_read();
-        // analise dimensional:
+
+        // Implementando filtro exponencial EMA para suavizar a leitura
+        adc_filtrado = alpha * raw + (1.0f - alpha) * adc_filtrado;
+
+        // Analise dimensional:
         // 3.3f eh o fundo de escala analogico do ADC da pico (ate quanto a porta le)
         // 4095 eh o fundo de escala digital do ADC (12 bits)
         //      float voltage_setpoint = raw * (3.3f / 4095);
@@ -109,9 +117,9 @@ int main()
         //      float angulo_setpoint = voltage_setpoint * (300 / 3.3f);
         // motor de passo tem 64 passos correspondendo a 5,625°
         //      float passo_setpoint = angulo_setpoint * (64 / 5.625);
-        // juntando todas estas contas, tem-se:
-        passo_setpoint = truncf((raw * 300.0f * 64.0f) / (4095.0f * 5.625f));
-        printf("raw_adc = %u, pass_setpoint = %i\n", raw, passo_setpoint);
+        // Juntando todas estas contas, tem-se:
+        passo_setpoint = truncf((adc_filtrado * 300.0f * 64.0f) / (4095.0f * 5.625f));
+        printf("raw_adc = %u, pass_setpoint = %i\n", adc_filtrado, passo_setpoint);
 
         if (first_time){
             passo_atual = passo_setpoint;
