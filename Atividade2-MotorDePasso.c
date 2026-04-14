@@ -2,6 +2,8 @@
 #include "pico/stdlib.h"
 
 
+// teste joao 1
+
 int main()
 {
     stdio_init_all();
