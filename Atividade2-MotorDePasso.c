@@ -7,10 +7,15 @@
 // TODO: filtro ADC (tirar ruidos)
 // TODO: ADC com interrupcao
 
+// ========================
+// Erich Abreu Serafim                  23.10022-2
+// João Pedro de Jesus Cândido Silva    23.01416-4
+
 #define IN1 2
 #define IN2 3
 #define IN3 4
 #define IN4 5
+#define POT_PIN 26
 
 // Sequencia de half steps
 int mat_seq[8][4] = {
@@ -91,7 +96,7 @@ int main()
 
     // Configuracoes do ADC
     adc_init();     // Habilita bloco ADC
-    adc_gpio_init(26);      // Habilita o pino 26 (GPIO26 do pinout)
+    adc_gpio_init(POT_PIN);      // Habilita o pino 26 (GPIO26 do pinout)
     adc_select_input(0);        // Configura porta do ADC no canal 0 (ADC0 do pinout)
 
     // Cria um timer de repeticao
@@ -100,7 +105,7 @@ int main()
     // Cria uma funcao repetitiva em cima do timer criado
     // Passo o delay em ms, funcao a ser rodada no callback, contexto de 
     // Identificador (usamos NULL) e o endereco do timer
-    add_repeating_timer_ms(5, step_callback, NULL, &timer);
+    add_repeating_timer_ms(3, step_callback, NULL, &timer);
 
     bool first_time = true;
     float adc_filtrado = 0.0f;
