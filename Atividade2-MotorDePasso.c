@@ -2,45 +2,114 @@
 #include "pico/stdlib.h"
 #include "hardware/adc.h"
 
-#define IN1 2
-#define IN2 3
-#define IN3 4
-#define IN4 5
+// =========================
+// CONFIG
+// =========================
 
-bool timer_cb(repeating_timer_t *t){
-    adc_run(true);
-    return true;
-}
+#define SENSOR_PIN 26          // GPIO26 = ADC0
+#define ADC_INPUT 0
 
-int main()
-{
+// =========================
+// GLOBAL VARIABLES
+// =========================
+
+float filtered = 0.0f;
+float baseline = 0.0f;
+
+bool beatDetected = false;
+
+uint32_t lastBeatTime = 0;
+
+float bpm = 0.0f;
+float smoothBpm = 0.0f;
+
+// =========================
+// MAIN
+// =========================
+
+int main() {
+
     stdio_init_all();
 
-    // Inicilaiza os pinos
-    gpio_init(IN1);
-    gpio_set_dir(IN1, GPIO_OUT);
-    gpio_init(IN2);
-    gpio_set_dir(IN2, GPIO_OUT);
-    gpio_init(IN3);
-    gpio_set_dir(IN3, GPIO_OUT);
-    gpio_init(IN4);
-    gpio_set_dir(IN4, GPIO_OUT);
+    // =========================
+    // ADC INIT
+    // =========================
 
-    // Inicializa o ADC
     adc_init();
-    adc_gpio_init(26);
-    adc_select_input(0);
 
-    // Cria e define o timer
-    repeating_timer_t timer;
-    add_repeating_timer_ms(5,timer_cb, NULL, &timer);
+    adc_gpio_init(SENSOR_PIN);
+
+    adc_select_input(ADC_INPUT);
+
+    sleep_ms(2000);
 
     while (true) {
-        // Lê sinal analógico
+
+        // =========================
+        // READ SENSOR
+        // =========================
+
         uint16_t raw = adc_read();
-        // Converte sinal analógico em volts
-        float volts = 3.3f/4095.0f*raw; // Tensão lida varia de 0 a 3.3 volts
 
+        // baseline tracking
+        baseline = 0.99f * baseline + 0.01f * raw;
 
+        // remove DC
+        float signal = raw - baseline;
+
+        // amplify
+        signal *= 10.0f;
+
+        // center signal
+        signal += 2048.0f;
+
+        // smoothing filter
+        filtered =
+            0.92f * filtered +
+            0.08f * signal;
+
+        // threshold
+        float threshold = 2300.0f;
+
+        // =========================
+        // BEAT DETECTION
+        // =========================
+
+        uint32_t now = to_ms_since_boot(get_absolute_time());
+
+        if (filtered > threshold && !beatDetected) {
+
+            beatDetected = true;
+
+            uint32_t delta = now - lastBeatTime;
+
+            // valid BPM range
+            if (delta > 300 && delta < 1500) {
+
+                bpm = 60000.0f / delta;
+
+                // smooth BPM
+                smoothBpm =
+                    0.85f * smoothBpm +
+                    0.15f * bpm;
+            }
+
+            lastBeatTime = now;
+        }
+
+        // reset detector
+        if (filtered < threshold - 100.0f) {
+            beatDetected = false;
+        }
+
+        // =========================
+        // SERIAL OUTPUT
+        // =========================
+
+        printf("%.2f,%.2f,1000,3000\n",
+               filtered,
+               smoothBpm);
+
+        sleep_ms(10);
     }
 }
